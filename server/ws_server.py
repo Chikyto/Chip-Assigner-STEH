@@ -66,6 +66,12 @@ class ChipAssignerServer:
         self._detection_queue = asyncio.Queue()
         self._dispatcher_task = asyncio.create_task(self._dispatch_detections())
 
+        # Si el driver fue pre-asignado por auto-connect en main.py,
+        # conectar su callback ahora que el loop y la queue ya están listos.
+        if self._driver:
+            self._driver.on_tag_detected = self._on_tag_detected_from_thread
+            logger.info("Callback del driver actualizado para auto-connect")
+
         logger.info(f"Chip-Assigner escuchando en ws://{host}:{port}")
         async with websockets.serve(self._handle_client, host, port):
             await asyncio.Future()  # Corre indefinidamente
@@ -154,11 +160,14 @@ class ChipAssignerServer:
             return
         self._driver.start_scanning()
         await self._broadcast({"type": "scanning_started"})
+        # Status extra para frontends que escuchan el tipo "status"
+        await self._broadcast({"type": "status", "connected": True, "scanning": True})
 
     async def _action_stop(self) -> None:
         if self._driver and self._driver.scanning:
             self._driver.stop_scanning()
         await self._broadcast({"type": "scanning_stopped"})
+        await self._broadcast({"type": "status", "connected": True, "scanning": False})
 
     # ------------------------------------------------------------------ #
     # Bridge hilo-serial → asyncio                                        #
