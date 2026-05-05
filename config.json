@@ -1,5 +1,5 @@
 {
   "ws_host": "localhost",
   "ws_port": 8765,
-  "serial_port": "COM5"
+  "serial_port": null
 }

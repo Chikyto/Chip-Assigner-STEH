@@ -63,8 +63,11 @@ async def connect_reader(server: ChipAssignerServer, forced_port: str | None) ->
     """
     logger = logging.getLogger(__name__)
 
+    current_forced_port = forced_port
+    used_forced_fallback = False
+
     while True:
-        port = forced_port or find_yr9011_port()
+        port = current_forced_port or find_yr9011_port()
 
         if not port:
             logger.warning(f"YR9011 no encontrado. Reintentando en {RETRY_INTERVAL}s...")
@@ -88,7 +91,15 @@ async def connect_reader(server: ChipAssignerServer, forced_port: str | None) ->
             await server._broadcast({"type": "status", "connected": True, "scanning": False, "port": port})
             return
         else:
-            logger.warning(f"No se pudo conectar a {port}. Reintentando en {RETRY_INTERVAL}s...")
+            if current_forced_port and not used_forced_fallback:
+                logger.warning(
+                    f"No se pudo conectar a {port}. "
+                    "Se intentara auto-detectar el lector en el proximo ciclo."
+                )
+                current_forced_port = None
+                used_forced_fallback = True
+            else:
+                logger.warning(f"No se pudo conectar a {port}. Reintentando en {RETRY_INTERVAL}s...")
             await asyncio.sleep(RETRY_INTERVAL)
 
 
@@ -101,7 +112,9 @@ async def main() -> None:
 
     ws_host = config.get("ws_host", DEFAULT_WS_HOST)
     ws_port = args.ws_port or config.get("ws_port", DEFAULT_WS_PORT)
-    forced_port = args.port or config.get("serial_port") or None
+    cli_port = args.port or None
+    config_port = config.get("serial_port") or None
+    forced_port = cli_port
 
     server = ChipAssignerServer()
 
@@ -111,10 +124,29 @@ async def main() -> None:
     logger.info("  Ctrl+C para detener")
     logger.info("=" * 55)
 
-    # Conectar el YR9011 en background (no bloquea el arranque del WS server)
-    asyncio.ensure_future(connect_reader(server, forced_port))
+    if cli_port:
+        logger.info(f"Puerto serial forzado por CLI: {cli_port}")
+    elif config_port:
+        logger.info(
+            f"Puerto serial configurado como fallback: {config_port}. "
+            "Se prioriza auto-deteccion por hardware."
+        )
 
-    await server.start(ws_host, ws_port)
+    # Conectar el YR9011 en background (no bloquea el arranque del WS server)
+    detected_port = None if cli_port else find_yr9011_port()
+    preferred_port = forced_port or detected_port or config_port
+    asyncio.ensure_future(connect_reader(server, preferred_port))
+
+    try:
+        await server.start(ws_host, ws_port)
+    except OSError as exc:
+        if exc.errno == 10048:
+            logger.error(
+                f"No se pudo iniciar ws://{ws_host}:{ws_port} porque el puerto ya esta en uso. "
+                "Cerra la otra instancia de ChipAssigner.exe o ejecuta este proceso con --ws-port."
+            )
+            return
+        raise
 
 
 if __name__ == "__main__":
