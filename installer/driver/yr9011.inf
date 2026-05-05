@@ -1,0 +1,37 @@
+; Driver para lector RFID INVELION YR9011
+; VID_04E8 & PID_20E4 — USB Serial (usbser.sys nativo de Windows)
+; Instalación: pnputil /add-driver yr9011.inf /install
+
+[Version]
+Signature   = "$Windows NT$"
+Class       = Ports
+ClassGuid   = {4D36E978-E325-11CE-BFC1-08002BE10318}
+Provider    = %ManufacturerName%
+DriverVer   = 05/05/2026,1.0.0.0
+CatalogFile = yr9011.cat
+
+[Manufacturer]
+%ManufacturerName% = DeviceList, NTamd64
+
+[DeviceList.NTamd64]
+%DeviceName% = DriverInstall, USB\VID_04E8&PID_20E4
+
+[DriverInstall]
+include     = mdmcpq.inf, usbser.inf
+CopyFiles   = FakeModemCopyFileSection
+
+[DriverInstall.Services]
+include    = usbser.inf
+AddService = usbser, 0x00000002, DriverService
+
+[DriverService]
+DisplayName    = %ServiceName%
+ServiceType    = 1
+StartType      = 3
+ErrorControl   = 1
+ServiceBinary  = %12%\usbser.sys
+
+[Strings]
+ManufacturerName = "INVELION"
+DeviceName       = "YR9011 RFID Reader (COM)"
+ServiceName      = "USB Serial Driver"

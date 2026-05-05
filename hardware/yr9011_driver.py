@@ -45,6 +45,18 @@ def list_available_ports() -> List[Dict[str, str]]:
     ]
 
 
+def find_yr9011_port() -> Optional[str]:
+    """
+    Auto-detecta el puerto COM del YR9011 por su VID/PID USB (04E8:20E4).
+    Retorna el nombre del puerto (ej. 'COM5') o None si no está conectado.
+    """
+    for p in serial.tools.list_ports.comports():
+        if "04E8:20E4" in p.hwid or "VID_04E8" in p.hwid.upper():
+            logger.info(f"YR9011 auto-detectado en {p.device} ({p.description})")
+            return p.device
+    return None
+
+
 class YR9011Driver:
     """
     Driver del lector YR9011 sin dependencias de GUI.
