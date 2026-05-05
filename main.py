@@ -24,6 +24,7 @@ import logging
 import sys
 from pathlib import Path
 
+from hardware.diagnostics import describe_serial_issue, find_tcp_listener_process
 from hardware.yr9011_driver import YR9011Driver, find_yr9011_port
 from server.ws_server import ChipAssignerServer
 
@@ -91,6 +92,7 @@ async def connect_reader(server: ChipAssignerServer, forced_port: str | None) ->
             await server._broadcast({"type": "status", "connected": True, "scanning": False, "port": port})
             return
         else:
+            logger.warning(describe_serial_issue(port, driver.last_error))
             if current_forced_port and not used_forced_fallback:
                 logger.warning(
                     f"No se pudo conectar a {port}. "
@@ -141,9 +143,11 @@ async def main() -> None:
         await server.start(ws_host, ws_port)
     except OSError as exc:
         if exc.errno == 10048:
+            listener = find_tcp_listener_process(ws_port)
+            owner_suffix = f" Proceso detectado: {listener}." if listener else ""
             logger.error(
                 f"No se pudo iniciar ws://{ws_host}:{ws_port} porque el puerto ya esta en uso. "
-                "Cerra la otra instancia de ChipAssigner.exe o ejecuta este proceso con --ws-port."
+                f"Cerra la otra instancia o ejecuta este proceso con --ws-port.{owner_suffix}"
             )
             return
         raise

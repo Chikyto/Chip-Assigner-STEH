@@ -9,6 +9,7 @@ Tambien se corrigio el puente interno entre el driver serial y el servidor WebSo
 - la desconexion fisica del lector ahora actualiza el estado interno y notifica al frontend
 - el arranque serial ahora prioriza auto-deteccion del lector por hardware
 - `serial_port` en `config.json` queda como fallback opcional y no como dependencia fija
+- el arranque ahora muestra diagnosticos mas claros si el `COM` no existe, esta ocupado o si el puerto WebSocket ya esta en uso
 
 ### Archivos afectados
 
@@ -43,6 +44,8 @@ Tambien se corrigio el puente interno entre el driver serial y el servidor WebSo
   El servicio primero intenta auto-detectar el lector por VID/PID USB.
 - Si necesitas forzar manualmente un puerto puntual, usar:
   `python main.py --port COM3`
+- Si el log dice que el `COM` "existe pero esta ocupado por otro proceso o sin permisos",
+  normalmente hay otra aplicacion usando el lector.
 
 ### Riesgos o supuestos
 

@@ -76,6 +76,7 @@ class YR9011Driver:
         self.on_error = on_error or (lambda msg: None)
 
         self._serial: Optional[serial.Serial] = None
+        self.last_error: Optional[Exception] = None
         self.connected = False
         self.scanning = False
 
@@ -90,6 +91,7 @@ class YR9011Driver:
             return False
         try:
             logger.info(f"Conectando a {self.port} @ {BAUDRATE} bps...")
+            self.last_error = None
             self._serial = serial.Serial(
                 port=self.port,
                 baudrate=BAUDRATE,
@@ -106,6 +108,7 @@ class YR9011Driver:
             logger.info(f"Lector conectado en {self.port}")
             return True
         except Exception as e:
+            self.last_error = e
             # Error de conexión inicial: solo loguear, no disparar on_error.
             # El caller (ws_server) es responsable de informar el fallo al frontend.
             logger.error(f"Error conectando a {self.port}: {e}")
