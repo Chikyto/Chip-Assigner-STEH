@@ -55,6 +55,7 @@ class ChipAssignerServer:
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._detection_queue: Optional[asyncio.Queue] = None
         self._dispatcher_task: Optional[asyncio.Task] = None
+        self._frontend_scanning: bool = False   # controla si los chips se reportan al frontend
 
     # ------------------------------------------------------------------ #
     # Arranque                                                             #
@@ -152,20 +153,26 @@ class ChipAssignerServer:
         if self._driver:
             self._driver.disconnect()
             self._driver = None
+        self._frontend_scanning = False
         await self._broadcast({"type": "disconnected"})
 
     async def _action_scan(self, ws: WebSocketServerProtocol) -> None:
         if not self._driver or not self._driver.connected:
             await self._send(ws, {"type": "error", "message": "Lector no conectado"})
             return
-        self._driver.start_scanning()
+        # El loop de hardware ya corre en background desde connect_reader().
+        # Solo activamos el flag para que las detecciones lleguen al frontend.
+        if not self._driver.scanning:
+            self._driver.start_scanning()
+        self._frontend_scanning = True
         await self._broadcast({"type": "scanning_started"})
         # Status extra para frontends que escuchan el tipo "status"
         await self._broadcast({"type": "status", "connected": True, "scanning": True})
 
     async def _action_stop(self) -> None:
-        if self._driver and self._driver.scanning:
-            self._driver.stop_scanning()
+        # Solo apagamos el reporte al frontend; el loop de hardware sigue corriendo
+        # para poder detectar desconexiones físicas aunque no haya escaneo activo.
+        self._frontend_scanning = False
         await self._broadcast({"type": "scanning_stopped"})
         await self._broadcast({"type": "status", "connected": True, "scanning": False})
 
@@ -190,10 +197,11 @@ class ChipAssignerServer:
             )
 
     async def _dispatch_detections(self) -> None:
-        """Tarea asyncio que lee la cola y difunde chip_detected a todos los clientes."""
+        """Tarea asyncio que lee la cola y difunde chip_detected solo cuando el frontend está escaneando."""
         while True:
             chip_id = await self._detection_queue.get()
-            await self._broadcast({"type": "chip_detected", "chip_id": chip_id})
+            if self._frontend_scanning:
+                await self._broadcast({"type": "chip_detected", "chip_id": chip_id})
 
     # ------------------------------------------------------------------ #
     # Helpers                                                              #

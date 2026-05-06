@@ -76,6 +76,7 @@ async def connect_reader(server: ChipAssignerServer, forced_port, tray=None) -> 
 
         if driver.connect():
             server._driver = driver
+            driver.start_scanning()   # loop permanente — detecta desconexión física siempre
             logger.info(f"YR9011 listo en {port}")
             if tray:
                 tray.set_ready(port)
@@ -103,6 +104,7 @@ async def watch_disconnection(server: ChipAssignerServer, forced_port, tray) -> 
             if tray:
                 tray.set_waiting()
             server._driver = None
+            server._frontend_scanning = False
             await server._broadcast({
                 "type": "status", "connected": False, "scanning": False, "port": None
             })
