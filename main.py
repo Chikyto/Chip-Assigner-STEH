@@ -59,7 +59,7 @@ async def connect_reader(server: ChipAssignerServer, forced_port, tray=None) -> 
         if server._driver and server._driver.connected:
             return
 
-        port = forced_port or find_yr9011_port()
+        port = find_yr9011_port() or forced_port   # VID/PID primero, config como fallback
 
         if not port:
             logger.warning(f"YR9011 no encontrado. Reintentando en {RETRY_INTERVAL}s...")
