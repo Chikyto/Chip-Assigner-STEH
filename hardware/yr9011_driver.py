@@ -195,6 +195,16 @@ class YR9011Driver:
 
                 time.sleep(0.05)
             except Exception as e:
+                error_str = str(e).lower()
+                # Detectar desconexión física del USB
+                if any(k in error_str for k in ("device not connected", "access is denied",
+                                                  "file not found", "device not found",
+                                                  "errno 5", "errno 22")):
+                    logger.error(f"Lector desconectado fisicamente: {e}")
+                    self.connected = False
+                    self.scanning  = False
+                    self._emit_error("USB_DISCONNECTED")
+                    return  # Salir del loop — main.py reconectara
                 logger.error(f"Error en loop de escaneo: {e}")
                 time.sleep(1)
 
