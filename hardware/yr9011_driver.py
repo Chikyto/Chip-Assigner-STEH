@@ -195,12 +195,31 @@ class YR9011Driver:
 
                 time.sleep(0.05)
             except Exception as e:
+                # Detectar desconexión física del USB.
+                # Se compara por código numérico (winerror/errno) para no depender
+                # del idioma del SO (los mensajes varían en español/inglés).
+                #   WinError 5   — ERROR_ACCESS_DENIED
+                #   WinError 2   — ERROR_FILE_NOT_FOUND (puerto cerrado por SO)
+                #   WinError 22  — ERROR_BAD_COMMAND
+                #   WinError 31  — ERROR_GEN_FAILURE
+                #   WinError 433 — ERROR_DEVICE_NOT_CONNECTED
+                #   WinError 1167— ERROR_DEVICE_NOT_CONNECTED (variante)
+                DISCONNECT_WINERRORS = {2, 5, 22, 31, 433, 1167}
+                DISCONNECT_ERRNOS    = {2, 5, 22}
+                DISCONNECT_KEYWORDS  = (
+                    "device not connected", "access is denied", "file not found",
+                    "device not found", "clearcommerror", "writefile failed",
+                    "dispositivo no", "acceso denegado", "no puede encontrar",
+                    "no se puede encontrar", "error de e/s",
+                )
+                winerr    = getattr(e, 'winerror', None)
+                errno_val = getattr(e, 'errno',    None)
                 error_str = str(e).lower()
-                # Detectar desconexión física del USB
-                if any(k in error_str for k in ("device not connected", "access is denied",
-                                                  "file not found", "device not found",
-                                                  "errno 5", "errno 22")):
-                    logger.error(f"Lector desconectado fisicamente: {e}")
+
+                if (winerr in DISCONNECT_WINERRORS
+                        or errno_val in DISCONNECT_ERRNOS
+                        or any(k in error_str for k in DISCONNECT_KEYWORDS)):
+                    logger.error(f"Lector desconectado fisicamente (winerr={winerr}): {e}")
                     self.connected = False
                     self.scanning  = False
                     self._emit_error("USB_DISCONNECTED")
